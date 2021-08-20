@@ -7,7 +7,7 @@
 #
 # MIT License
 # 
-# Copyright (c) 2021 defparam
+# Copyright (c) 2021 pmnh
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -28,7 +28,6 @@
 # SOFTWARE.
 
 from os import dup
-import sys
 import requests
 import json
 import argparse
@@ -37,7 +36,6 @@ import html
 from datetime import datetime
 # used for parsing of the program HTML pages to grab React JSON data because there is no APO :(
 from bs4 import BeautifulSoup
-
 
 def get_all_programs(args):
     headers = {
@@ -71,7 +69,7 @@ def get_all_programs(args):
 
         # update the total from the cursor
         progtotal = data["meta"]["totalHits"]
-        print("total: %d" % progtotal)
+        # print("total: %d" % progtotal)
         offset = offset + 25
     
     columns = ["code","name","can_subscribe","in_progress?","invited_status","participation","full_url","reward_range_summary",
@@ -120,8 +118,12 @@ def get_program_details(args, slug):
     # extract other data from HTML because - no API and no structured data - ugh :~(
     brief_stats_tag = soup.find("div", attrs={"id":"user-guides__bounty-brief__stats"})
     brief_strong_tags = brief_stats_tag.find_all("strong")
-    # print(brief_strong_tags)
-    rewarded_bugs = brief_strong_tags[0].text
+    if len(brief_strong_tags)>1:
+        # print(brief_strong_tags)
+        rewarded_bugs = brief_strong_tags[0].text
+    else:
+        rewarded_bugs = None
+
     if len(brief_strong_tags)>1:
         validation_days = brief_strong_tags[1].text # todo, clean up
     else:
