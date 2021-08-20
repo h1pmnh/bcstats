@@ -90,48 +90,49 @@ def get_program_details(args, slug):
     }
 
     program_url = "https://bugcrowd.com/%s" % (slug)
-    resp = requests.get(program_url, headers=headers)
-    data = resp.text
-    soup = BeautifulSoup(data, features="lxml")
-    tags = soup.find_all("div", attrs={"data-react-class": "ResearcherTargetGroups"})
-    if len(tags) != 1:
-        print("ERROR: Expected only one `ResearcherTargetGroups` React data")
-    # print(tags[0])
-    program_data = json.loads(html.unescape(tags[0]["data-react-props"]))
-    # print(json.dumps(program_data))
-
     max_bounties = {"p1":0, "p2":0, "p3":0, "p4":0, "p5":0}
     duplicate_bugs = 0
     unique_bugs = 0
-    for group in program_data["groups"]:
-        # get max rewards by priority
-        for pri in ["1", "2", "3", "4", "5"]:
-            if pri in group["reward_range"] and group["reward_range"][pri]["max"] and group["reward_range"][pri]["max"] > max_bounties["p"+pri]:
-                max_bounties["p"+pri] = group["reward_range"][pri]["max"]
-        # accumulate total and unique bug counts if the program discloses
-        for target in group["targets"]:
-            if "known_issues" in target and "totals" in target["known_issues"]:
-                unique_bugs += target["known_issues"]["totals"]["unique"]
-                duplicate_bugs += target["known_issues"]["totals"]["duplicate"]
-    # print(max_bounties)
+    average_bounty = None
+    validation_days = None
+    rewarded_bugs = None
 
-    # extract other data from HTML because - no API and no structured data - ugh :~(
-    brief_stats_tag = soup.find("div", attrs={"id":"user-guides__bounty-brief__stats"})
-    brief_strong_tags = brief_stats_tag.find_all("strong")
-    if len(brief_strong_tags)>1:
-        # print(brief_strong_tags)
-        rewarded_bugs = brief_strong_tags[0].text
+    resp = requests.get(program_url, headers=headers)
+    data = resp.text
+    if data.find("Compliance required") != -1:
+        print("  [+] Program has a compliance agreement which has not been accepted - skipping")
     else:
-        rewarded_bugs = None
+        soup = BeautifulSoup(data, features="lxml")
+        tags = soup.find_all("div", attrs={"data-react-class": "ResearcherTargetGroups"})
+        if len(tags) != 1:
+            print("ERROR: Expected only one `ResearcherTargetGroups` React data")
+        # print(tags[0])
+        program_data = json.loads(html.unescape(tags[0]["data-react-props"]))
+        # print(json.dumps(program_data))
 
-    if len(brief_strong_tags)>1:
-        validation_days = brief_strong_tags[1].text # todo, clean up
-    else:
-        validation_days = None
-    if len(brief_strong_tags)>2:
-        average_bounty = brief_strong_tags[2].text[1:]
-    else:
-        average_bounty = None
+        for group in program_data["groups"]:
+            # get max rewards by priority
+            for pri in ["1", "2", "3", "4", "5"]:
+                if pri in group["reward_range"] and group["reward_range"][pri]["max"] and group["reward_range"][pri]["max"] > max_bounties["p"+pri]:
+                    max_bounties["p"+pri] = group["reward_range"][pri]["max"]
+            # accumulate total and unique bug counts if the program discloses
+            for target in group["targets"]:
+                if "known_issues" in target and "totals" in target["known_issues"]:
+                    unique_bugs += target["known_issues"]["totals"]["unique"]
+                    duplicate_bugs += target["known_issues"]["totals"]["duplicate"]
+        # print(max_bounties)
+
+        # extract other data from HTML because - no API and no structured data - ugh :~(
+        brief_stats_tag = soup.find("div", attrs={"id":"user-guides__bounty-brief__stats"})
+        brief_strong_tags = brief_stats_tag.find_all("strong")
+        if len(brief_strong_tags)>1:
+            # print(brief_strong_tags)
+            rewarded_bugs = brief_strong_tags[0].text
+        if len(brief_strong_tags)>1:
+            validation_days = brief_strong_tags[1].text # todo, clean up
+        if len(brief_strong_tags)>2:
+            average_bounty = brief_strong_tags[2].text[1:]
+        #end big else
 
     program_data = {
         "max_bounties":max_bounties,
