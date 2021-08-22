@@ -4,6 +4,8 @@
 
 The tool concept is based on the wonderful [`h1stats` tool by @defparam](https://github.com/defparam/h1stats)
 
+Although I wasn't aware of it at the time I wrote this tool (mostly to learn about Bugcrowd), fyoorer noted their tool which is available [on Github](https://github.com/fyoorer/bcstats) - I haven't tried but the code looks better, feel free to use whichever you like!
+
 **Important** Bugcrowd private program is PRIVATE TO YOU and disclosure of any non-public data *will* violate the NDA you signed. Do not ever share private program information, including in any contribution to this project. This tool should not be used to violate any applicable NDA or legal agreement and is not endorsed by Bugcrowd in any way. The author disclaims any liability related to use of this tool.
 
 ## Installation
