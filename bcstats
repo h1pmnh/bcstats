@@ -34,10 +34,14 @@ import argparse
 import csv
 import html
 from datetime import datetime
-# used for parsing of the program HTML pages to grab React JSON data because there is no APO :(
+# used for parsing of the program HTML pages to grab React JSON data because there is no API :(
 from bs4 import BeautifulSoup
 
 def get_all_programs(args):
+    if args.session_cookie.find("%") >= 0:
+        print("ERROR: This doesn't look like a _crowdcontrol_session or may be URL encoded, make sure you are using the decoded session cookie!")
+        exit(1)
+
     headers = {
         "Cookie":"_crowdcontrol_session=%s" % args.session_cookie
     }
@@ -48,21 +52,20 @@ def get_all_programs(args):
     all_programs = []
     while(progcount < progtotal):
         search_url = "https://bugcrowd.com/programs.json?%s&offset[]=%d" % (args.search_params, offset)
-        print(search_url)
         resp = requests.get(search_url, headers=headers)
-        # print(resp)
         # print(resp.text)
         data = json.loads(resp.text)
         progcount += len(data["programs"])
-        print("[+] Collecting... (%d programs)                              \r"%(progcount), flush=1, end='')
+        print("[+] Collecting... (%d programs)                              "%(progcount), flush=1, end='\n')
         enriched_programs = []
         for program in data["programs"]:
-            print("Extracting data for %s" % program["code"])
+            print("Extracting data for %s                              " % program["code"], end='\r')
             program["full_url"] = "https://bugcrowd.com%s" % (program["program_url"])
             if program["invited_status"] not in ["joinable","waitlistable"]:
                 prog_details = get_program_details(args, program["code"])
-                program.update(prog_details["max_bounties"])
-                program.update(prog_details)
+                if prog_details:
+                    program.update(prog_details["max_bounties"])
+                    program.update(prog_details)
 
             enriched_programs.append(program)
         all_programs.extend(enriched_programs)
@@ -73,7 +76,7 @@ def get_all_programs(args):
         offset = offset + 25
     
     columns = ["code","name","can_subscribe","in_progress?","invited_status","participation","full_url","reward_range_summary",
-        "duplicate_bugs","unique_bugs","rewarded_bugs","validation_days","average_bounty","p1","p2","p3","p4","p5"]
+        "duplicate_bugs","unique_bugs","rewarded_bugs","validation_days","average_bounty","p1","p2","p3","p4","p5","shows_known_issues","has_crowdstream","has_hall_of_fame"]
 
     now = datetime.now()
     filename = "bcstats-%s-%s-%s.csv"%(str(now.year),str(now.month),str(now.day))
@@ -96,11 +99,16 @@ def get_program_details(args, slug):
     average_bounty = None
     validation_days = None
     rewarded_bugs = None
+    shows_known_issues = False
 
     resp = requests.get(program_url, headers=headers)
+    if resp.status_code != 200:
+        print("  [+] Program %s returned a status code %s, skipping program details..." % (slug, resp.status_code))
+        return None
+
     data = resp.text
     if data.find("Compliance required") != -1:
-        print("  [+] Program has a compliance agreement which has not been accepted - skipping")
+        print("  [+] Program %s has a compliance agreement which has not been accepted - skipping" % (slug))
     else:
         soup = BeautifulSoup(data, features="lxml")
         tags = soup.find_all("div", attrs={"data-react-class": "ResearcherTargetGroups"})
@@ -134,13 +142,31 @@ def get_program_details(args, slug):
             average_bounty = brief_strong_tags[2].text[1:]
         #end big else
 
+        # look for a program which discloses known issues
+        has_known_issues = soup.find("td", attrs={"data-label":"Known issues"})
+        if has_known_issues and len(has_known_issues) > 0:
+            shows_known_issues = True
+
+        has_crowdstream = False
+        has_hall_of_fame = False
+        # look for which tabs are shown
+        subnavs = soup.find_all("li", attrs={"class":"bc-subnav__item"})
+        for subnav in subnavs:
+            if subnav.text.strip() == "CrowdStream":
+                has_crowdstream = True
+            if subnav.text.strip() == "Hall of Fame":
+                has_hall_of_fame = True
+
     program_data = {
         "max_bounties":max_bounties,
         "duplicate_bugs":duplicate_bugs,
         "unique_bugs":unique_bugs,
         "rewarded_bugs":rewarded_bugs,
         "validation_days":validation_days,
-        "average_bounty":average_bounty
+        "average_bounty":average_bounty,
+        "shows_known_issues":shows_known_issues,
+        "has_crowdstream":has_crowdstream,
+        "has_hall_of_fame":has_hall_of_fame
     }
     # print(json.dumps(program_data))
     return program_data
