@@ -114,27 +114,29 @@ def get_program_details(args, slug):
         tags = soup.find_all("div", attrs={"data-react-class": "ResearcherTargetGroups"})
         if len(tags) != 1:
             print("ERROR: Expected only one `ResearcherTargetGroups` React data")
-        # print(tags[0])
-        program_data = json.loads(html.unescape(tags[0]["data-react-props"]))
-        # print(json.dumps(program_data))
+
+        resp_groups = requests.get(program_url + "/target_groups", headers=headers)
+        program_data = json.loads(resp_groups.text)
 
         for group in program_data["groups"]:
             # get max rewards by priority
             for pri in ["1", "2", "3", "4", "5"]:
                 if pri in group["reward_range"] and group["reward_range"][pri]["max"] and group["reward_range"][pri]["max"] > max_bounties["p"+pri]:
                     max_bounties["p"+pri] = group["reward_range"][pri]["max"]
+            
+            # separate JSON call now for each target group stats
+            resp_group_stats = requests.get("https://bugcrowd.com" + group["targets_url"], headers=headers)
+            group_data = json.loads(resp_group_stats.text)
             # accumulate total and unique bug counts if the program discloses
-            for target in group["targets"]:
+            for target in group_data["targets"]:
                 if "known_issues" in target and "totals" in target["known_issues"]:
                     unique_bugs += target["known_issues"]["totals"]["unique"]
                     duplicate_bugs += target["known_issues"]["totals"]["duplicate"]
-        # print(max_bounties)
 
         # extract other data from HTML because - no API and no structured data - ugh :~(
         brief_stats_tag = soup.find("div", attrs={"id":"user-guides__bounty-brief__stats"})
         brief_strong_tags = brief_stats_tag.find_all("strong")
         if len(brief_strong_tags)>1:
-            # print(brief_strong_tags)
             rewarded_bugs = brief_strong_tags[0].text
         if len(brief_strong_tags)>1:
             validation_days = brief_strong_tags[1].text # todo, clean up
