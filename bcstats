@@ -111,6 +111,7 @@ def get_program_details(args, slug):
     data = resp.text
     if data.find("Compliance required") != -1:
         print("  [+] Program %s has a compliance agreement which has not been accepted - skipping" % (slug))
+        return None
     else:
         soup = BeautifulSoup(data, features="lxml")
         tags = soup.find_all("div", attrs={"data-react-class": "ResearcherTargetGroups"})
