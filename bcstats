@@ -138,13 +138,17 @@ def get_program_details(args, slug):
 
         # extract other data from HTML because - no API and no structured data - ugh :~(
         brief_stats_tag = soup.find("div", attrs={"id":"user-guides__bounty-brief__stats"})
-        brief_strong_tags = brief_stats_tag.find_all("strong")
-        if len(brief_strong_tags)>1:
-            rewarded_bugs = brief_strong_tags[0].text
-        if len(brief_strong_tags)>1:
-            validation_days = brief_strong_tags[1].text # todo, clean up
-        if len(brief_strong_tags)>2:
-            average_bounty = brief_strong_tags[2].text[1:]
+        # li tags within here
+        brief_stats_lis = brief_stats_tag.find_all("li")
+        for brief_stats_li in brief_stats_lis:
+            title_tag = brief_stats_li.find("span", attrs={"class":"bc-stat__title"}).text.strip().translate(str.maketrans('', '', ' \n\t\r'))
+            # remove whitespace to ease parsing
+            if "Validationwithin" == title_tag:
+                validation_days = brief_stats_li.find("span", attrs={"class":"bc-stat__fig"}).text.strip()
+            elif "Vulnerabilitiesrewarded" == title_tag:
+                rewarded_bugs = brief_stats_li.find("span", attrs={"class":"bc-stat__fig"}).text.strip()
+            elif "Averagepayout" == title_tag:
+                average_bounty = brief_stats_li.find("span", attrs={"class":"bc-stat__fig"}).text.strip()[1:]
         #end big else
 
         # look for a program which discloses known issues
