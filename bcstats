@@ -60,14 +60,16 @@ def get_all_programs(args):
         enriched_programs = []
         for program in data["programs"]:
             print("Extracting data for %s                              " % program["code"], end='\r')
-            program["full_url"] = "https://bugcrowd.com%s" % (program["program_url"])
-            if program["invited_status"] not in ["joinable","waitlistable"]:
-                prog_details = get_program_details(args, program["code"])
-                if prog_details:
-                    program.update(prog_details["max_bounties"])
-                    program.update(prog_details)
+            if "program_url" in program:
+                # use case for a "Program starting soon" program
+                program["full_url"] = "https://bugcrowd.com%s" % (program["program_url"])
+                if program["invited_status"] not in ["joinable","waitlistable"]:
+                    prog_details = get_program_details(args, program["code"])
+                    if prog_details:
+                        program.update(prog_details["max_bounties"])
+                        program.update(prog_details)
 
-            enriched_programs.append(program)
+                enriched_programs.append(program)
         all_programs.extend(enriched_programs)
 
         # update the total from the cursor
