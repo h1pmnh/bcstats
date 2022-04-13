@@ -64,10 +64,13 @@ def get_all_programs(args):
                 # use case for a "Program starting soon" program
                 program["full_url"] = "https://bugcrowd.com%s" % (program["program_url"])
                 if program["invited_status"] not in ["joinable","waitlistable"]:
-                    prog_details = get_program_details(args, program["code"])
-                    if prog_details:
-                        program.update(prog_details["max_bounties"])
-                        program.update(prog_details)
+                    try:
+                        prog_details = get_program_details(args, program["code"])
+                        if prog_details:
+                            program.update(prog_details["max_bounties"])
+                            program.update(prog_details)
+                    except:
+                        print(" [!] Unable to get details for program %s" % (program["code"]))
 
                 enriched_programs.append(program)
         all_programs.extend(enriched_programs)
@@ -119,7 +122,12 @@ def get_program_details(args, slug):
             print("ERROR: Expected only one `ResearcherTargetGroups` React data")
 
         resp_groups = requests.get(program_url + "/target_groups", headers=headers)
-        program_data = json.loads(resp_groups.text)
+        try:
+            program_data = json.loads(resp_groups.text)
+        except json.JSONDecodeError as e:
+            print(" [!] Unable to decode JSON for program %s: %s" % (slug, e))
+            print(" [!] Response received was: %s" % (resp_groups.text))
+            program_data = {"groups":[]}
 
         for group in program_data["groups"]:
             # get max rewards by priority
