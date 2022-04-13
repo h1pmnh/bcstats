@@ -47,14 +47,21 @@ def get_all_programs(args):
     }
 
     offset = 0
+    page = 1 # in Apr 2022 or so, BC decided to once again change the pagination API
     progcount = 0
     progtotal = 99999
     all_programs = []
     while(progcount < progtotal):
-        search_url = "https://bugcrowd.com/programs.json?%s&offset[]=%d" % (args.search_params, offset)
+        search_url = "https://bugcrowd.com/programs.json?%s&page[]=%d" % (args.search_params, page)
         resp = requests.get(search_url, headers=headers)
         # print(resp.text)
         data = json.loads(resp.text)
+        # this typically is a fatal error such as an expired cookie
+        if "error" in data:
+            print(" [!] Error reported: %s" % data["error"])
+            print(" [!] Aborting run")
+            exit(1)
+        
         progcount += len(data["programs"])
         print("[+] Collecting... (%d programs)                              "%(progcount), flush=1, end='\n')
         enriched_programs = []
@@ -78,7 +85,8 @@ def get_all_programs(args):
         # update the total from the cursor
         progtotal = data["meta"]["totalHits"]
         # print("total: %d" % progtotal)
-        offset = offset + 25
+        # offset = offset + 25
+        page = page + 1
     
     columns = ["code","name","can_subscribe","in_progress?","invited_status","participation","full_url","reward_range_summary",
         "duplicate_bugs","unique_bugs","rewarded_bugs","validation_days","average_bounty","p1","p2","p3","p4","p5","shows_known_issues","has_crowdstream","has_hall_of_fame"]
