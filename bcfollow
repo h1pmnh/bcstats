@@ -1,0 +1,125 @@
+#!/usr/bin/python3
+#
+# bcfollow is built to subscribe (follow) all programs on Bugcrowd where you are not already
+# subscribed - it is very similar to bcstats
+#
+# Authors: pmnh (h1pmnh)
+#
+# MIT License
+# 
+# Copyright (c) 2021 pmnh
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+from os import dup
+import requests
+import json
+import argparse
+import csv
+import html
+from datetime import datetime
+# used for parsing of the program HTML pages to grab React JSON data because there is no API :(
+from bs4 import BeautifulSoup
+
+def get_all_programs(args):
+    if args.session_cookie.find("%") >= 0:
+        print("ERROR: This doesn't look like a _crowdcontrol_session or may be URL encoded, make sure you are using the decoded session cookie!")
+        exit(1)
+
+    headers = {
+        "Cookie":"_crowdcontrol_session=%s" % args.session_cookie
+    }
+
+    csrf_token = get_csrf_token(args)
+    print("[+] Got CSRF token %s..." % csrf_token)
+    offset = 0
+    page = 1 # in Apr 2022 or so, BC decided to once again change the pagination API
+    progcount = 0
+    progtotal = 99999
+    while(progcount < progtotal):
+        search_url = "https://bugcrowd.com/programs.json?%s&page[]=%d" % (args.search_params, page)
+        resp = requests.get(search_url, headers=headers)
+        # print(resp.text)
+        data = json.loads(resp.text)
+        # this typically is a fatal error such as an expired cookie
+        if "error" in data:
+            print(" [!] Error reported: %s" % data["error"])
+            print(" [!] Aborting run")
+            exit(1)
+        
+        progcount += len(data["programs"])
+        print("[+] Checking... (%d programs)                              "%(progcount), flush=1, end='\n')
+        for program in data["programs"]:
+            # print("Extracting data for %s                              " % program["code"], end='\r')
+            if "program_url" in program:
+                # use case for a "Program starting soon" program
+                program["full_url"] = "https://bugcrowd.com%s" % (program["program_url"])
+                if program["invited_status"] not in ["joinable","waitlistable"]:
+                    if program["following"] is False:
+                        try:
+                            follow_program(args, csrf_token, program["code"])
+                            print(" [+] Now following %s " % program["code"])
+                        except:
+                            print(" [!] Unable to get details for program %s" % (program["code"]))
+
+        # update the total from the cursor
+        progtotal = data["meta"]["totalHits"]
+        # print("total: %d" % progtotal)
+        # offset = offset + 25
+        page = page + 1
+    
+    print("[+] DONE!")
+
+def get_csrf_token(args):
+    headers = {
+        "Cookie":"_crowdcontrol_session=%s" % args.session_cookie
+    }
+    resp = requests.get("https://bugcrowd.com/programs", headers=headers)
+    if resp.status_code != 200:
+        print("  [+] Program page returned a bad status code (%s), stopping!" % (resp.status_code))
+        exit(1)
+
+    data = resp.text
+    soup = BeautifulSoup(data, features="lxml")
+    # sorry, if we don't find this we'll just fail badly
+    meta = soup.find("meta", attrs={"name":"csrf-token"})
+    if meta is None:
+        print("  [!] can't find meta tag with csrf token, this may mean your session cookie is expired, stopping!")
+        exit(1)
+    return meta.attrs["content"].strip()
+
+def follow_program(args, csrf_token, slug):
+    headers = {
+        "Cookie":"_crowdcontrol_session=%s" % args.session_cookie,
+        "x-csrf-token":csrf_token
+    }
+
+    program_url = "https://bugcrowd.com/%s/program_subscribers.json" % (slug)
+    resp = requests.post(program_url, headers=headers, json={})
+    if resp.status_code != 200:
+        print("  [!] Program %s returned a status code %s, skipping..." % (slug, resp.status_code))
+        exit(1)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-s", "--session_cookie", help="Value of your _crowdcontrol_session cookie", required=True)
+    parser.add_argument("-p", "--search_params", default="sort[]=promoted-desc&hidden[]=false&vdp[]=false", help="Search params for the program search, modify if you want to follow VDPs too", required=False)
+    args = parser.parse_args()
+    get_all_programs(args)
+
