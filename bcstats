@@ -89,7 +89,7 @@ def get_all_programs(args):
         page = page + 1
     
     columns = ["code","name","can_subscribe","in_progress?","invited_status","participation","full_url","reward_range_summary",
-        "duplicate_bugs","unique_bugs","rewarded_bugs","validation_days","average_bounty","p1","p2","p3","p4","p5","shows_known_issues","has_crowdstream","has_hall_of_fame"]
+        "duplicate_bugs","unique_bugs","rewarded_bugs","validation_days","average_bounty","p1","p2","p3","p4","p5","shows_known_issues","has_crowdstream","has_hall_of_fame", "collaboration_enabled","managed?"]
 
     now = datetime.now()
     filename = "bcstats-%s-%s-%s.csv"%(str(now.year),str(now.month),str(now.day))
